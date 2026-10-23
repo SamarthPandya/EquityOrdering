@@ -37,5 +37,4 @@ def compute_iv(market_price, F, K, T, r=0.065, opt_type='CE'):
         )
         return iv
     except ValueError:
-        # Market price is completely detached from theoretical bounds (often true for deep OTM illiquid strikes)
         return np.nan

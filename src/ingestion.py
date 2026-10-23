@@ -11,7 +11,6 @@ def parse_single_bhavcopy(file_path: str) -> pd.DataFrame:
 
     df = pd.read_csv(file_path)
     
-    # Standardize column names
     col_map = {
         'TIMESTAMP': 'DATE', 'TradDt': 'DATE',
         'INSTRUMENT': 'INSTRUMENT', 'FinInstrmTp': 'INSTRUMENT',
@@ -27,44 +26,31 @@ def parse_single_bhavcopy(file_path: str) -> pd.DataFrame:
     
     df['DATE'] = pd.to_datetime(df['DATE'], format='mixed', dayfirst=True)
     df['EXPIRY_DT'] = pd.to_datetime(df['EXPIRY_DT'], format='mixed', dayfirst=True)
-    
-    # index derivatives exclusion
     df = df[df['INSTRUMENT'].isin(['FUTSTK', 'OPTSTK', 'STF', 'STO'])].copy()
-    
-    # Calculate DTE then apply the 10-60 day maturity window
     df['DTE'] = (df['EXPIRY_DT'] - df['DATE']).dt.days
     df = df[(df['DTE'] >= 10) & (df['DTE'] <= 60)]
     
     if df.empty:
         return pd.DataFrame()
     
-    # Extract Futures Baseline (F_t) for black 76
+    # Futures Baseline (F_t) for black 76
     futures = df[df['INSTRUMENT'].isin(['FUTSTK', 'STF'])][
         ['DATE', 'SYMBOL', 'EXPIRY_DT', 'CLOSE']
     ].rename(columns={'CLOSE': 'FUT_CLOSE'})
     
-    # avoid duplicates
+
     futures = futures.drop_duplicates(subset=['SYMBOL', 'EXPIRY_DT'])
     
     options = df[df['INSTRUMENT'].isin(['OPTSTK', 'STO'])].copy()
-    
-    # Apply baseline liquidity masks
     options = options[(options['VOLUME'] > 0) & (options['OI'] > 0) & (options['CLOSE'] > 0.50)]
-    
-    # Bind the Futures price to the Options chain
     options = pd.merge(options, futures, on=['DATE', 'SYMBOL', 'EXPIRY_DT'], how='inner')
     
-    # Moneyness Bucketing (K / F_t)
     options['MONEYNESS'] = options['STRIKE'] / options['FUT_CLOSE']
-    
-    # ATM Calls: [0.95, 1.05]
     atm_calls = options[
         (options['OPT_TYPE'] == 'CE') & 
         (options['MONEYNESS'].between(0.95, 1.05))
     ].copy()
     atm_calls['DIST_TO_TARGET'] = (atm_calls['MONEYNESS'] - 1.00).abs()
-    
-    # OTM Puts: [0.80, 0.95)
     otm_puts = options[
         (options['OPT_TYPE'] == 'PE') & 
         (options['MONEYNESS'] >= 0.80) & 
@@ -72,11 +58,11 @@ def parse_single_bhavcopy(file_path: str) -> pd.DataFrame:
     ].copy()
     otm_puts['DIST_TO_TARGET'] = (otm_puts['MONEYNESS'] - 0.95).abs()
     
-    # Strike Isolation (Closest to target moneyness)
+    # Closest to target moneyness
     best_calls = atm_calls.sort_values('DIST_TO_TARGET').groupby(['DATE', 'SYMBOL']).first().reset_index()
     best_puts = otm_puts.sort_values('DIST_TO_TARGET').groupby(['DATE', 'SYMBOL']).first().reset_index()
     
-    # final vertical data frame
+    # final df
     filtered_daily_chain = pd.concat([best_calls, best_puts], ignore_index=True)
     
     return filtered_daily_chain[

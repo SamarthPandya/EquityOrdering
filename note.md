@@ -133,5 +133,10 @@ To run the final analysis, simply execute the main script from your terminal: py
 * All csv files can be inspected at data/csv_data
 * Any newly generated parquet files can be converted to csv for inspection using the script at **data/processed/convert_to_csv.py**
 
+# Conclusion
+
+The backtest reveals a weak historical effect where equities with the lowest implied volatility skew (Q1) marginally outperform those with the highest skew (Q5) by 2.45% annualized. However, the signal possesses little standalone predictive capacity, evidenced by an extremely low Mean Rank IC of 0.0099 and a weak Information Ratio of 0.2986. The combination of microstructure friction on OTM strikes and a prohibitively high average Q1 monthly turnover of 72.12% renders this specific skew formulation economically unviable as a standalone strategy after transaction costs.
+
+In a multi-factor framework, extreme skew readings can serve as a risk-exclusion indicator preventing long positions in names with sudden spikes in skew values representing institutional aversion premium.
 
 
