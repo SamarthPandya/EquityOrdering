@@ -8,14 +8,14 @@ from io import BytesIO
 from zipfile import ZipFile
 
 
-# directory to store data
+
 output_dir = "data/raw_fo"
 os.makedirs(output_dir, exist_ok=True)
 
-# Generate all weekdays between Jan 2021 and Dec 2023
+
 dates = pd.bdate_range(start="2021-01-01", end="2023-12-31")
 
-# browser headers
+
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': '*/*',

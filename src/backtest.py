@@ -6,11 +6,10 @@ def run_cross_sectional_backtest(signals_df: pd.DataFrame, prices_df: pd.DataFra
     """
     Merges signals with forward returns, ranks into quintiles, and computes IC.
     """
-    # 1. Align Dates (1-Day Execution Lag)
+    # Align Dates (1-Day Execution Lag)
     # Get all unique trading days from the price data
     trading_days = sorted(prices_df['DATE'].unique())
     
-    # Map each REBAL_DATE to the next available trading day (t+1 entry)
     def get_next_trading_day(d):
         future_days = [td for td in trading_days if td > d]
         return future_days[0] if future_days else pd.NaT
@@ -18,7 +17,7 @@ def run_cross_sectional_backtest(signals_df: pd.DataFrame, prices_df: pd.DataFra
     rebal_dates = sorted(signals_df['REBAL_DATE'].unique())
     date_mapping = {d: get_next_trading_day(d) for d in rebal_dates}
     
-    # 2. Compute Forward Returns
+
     returns_list = []
     for i in range(len(rebal_dates) - 1):
         current_rebal = rebal_dates[i]
@@ -30,7 +29,7 @@ def run_cross_sectional_backtest(signals_df: pd.DataFrame, prices_df: pd.DataFra
         if pd.isna(entry_date) or pd.isna(exit_date):
             continue
             
-        # Get prices for entry and exit
+
         p_entry = prices_df[prices_df['DATE'] == entry_date][['SYMBOL', 'ADJ_CLOSE']].rename(columns={'ADJ_CLOSE': 'P_IN'})
         p_exit = prices_df[prices_df['DATE'] == exit_date][['SYMBOL', 'ADJ_CLOSE']].rename(columns={'ADJ_CLOSE': 'P_OUT'})
         
@@ -43,10 +42,10 @@ def run_cross_sectional_backtest(signals_df: pd.DataFrame, prices_df: pd.DataFra
         
     fwd_returns_df = pd.concat(returns_list, ignore_index=True)
     
-    # 3. Merge Signal with Returns
+    # Merge Signal with Returns
     merged = pd.merge(signals_df, fwd_returns_df, on=['REBAL_DATE', 'SYMBOL'], how='inner')
     
-    # 4. Cross-Sectional Ranking (Quintiles)
+
     # Safety Check: Drop rebalance dates that have fewer than 20 stocks
     stock_counts = merged.groupby('REBAL_DATE').size()
     valid_rebal_dates = stock_counts[stock_counts >= 20].index
@@ -55,13 +54,12 @@ def run_cross_sectional_backtest(signals_df: pd.DataFrame, prices_df: pd.DataFra
     if merged.empty:
         raise ValueError("No valid rebalance dates left after filtering for minimum stock count. Check your data ingestion.")
 
-    # 1 = Lowest Skew (Buy), 5 = Highest Skew (Avoid)
-    # Using labels=False + 1 safely assigns 1 through 5 without throwing duplicate bin errors
+   
     merged['QUINTILE'] = merged.groupby('REBAL_DATE')['MONTHLY_SKEW'].transform(
         lambda x: pd.qcut(x.rank(method='first'), q=5, labels=False) + 1
     )
     
-    # 5. Performance Metrics
+
     # Bucket Returns
     bucket_rets = merged.groupby(['REBAL_DATE', 'QUINTILE'])['FWD_RETURN'].mean().unstack()
     bucket_rets['EW_UNIVERSE'] = merged.groupby('REBAL_DATE')['FWD_RETURN'].mean()
